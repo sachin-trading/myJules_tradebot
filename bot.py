@@ -44,10 +44,11 @@ class TradeBot:
         return response
 
     def is_in_window(self, window):
-        now = datetime.datetime.now().time()
+        # Always use IST (UTC+5:30)
+        ist_now = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=5, minutes=30)).time()
         start = datetime.datetime.strptime(window[0], "%H:%M").time()
         end = datetime.datetime.strptime(window[1], "%H:%M").time()
-        return start <= now <= end
+        return start <= ist_now <= end
 
     def get_active_config(self):
         if self.is_in_window(config.NIFTY_WINDOW):
@@ -73,6 +74,7 @@ class TradeBot:
         
         while True:
             try:
+                ist_now_dt = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=5, minutes=30)
                 active_cfg = self.get_active_config()
 
                 if not active_cfg:
@@ -84,7 +86,7 @@ class TradeBot:
                         self.entry_price = 0
                         self.current_underlying = None
 
-                    print(f"[{datetime.datetime.now()}] Outside trading hours. Waiting...")
+                    print(f"[{ist_now_dt}] Outside trading hours. Waiting...")
                     time.sleep(60)
                     continue
 
@@ -106,7 +108,7 @@ class TradeBot:
                 current_price = self.get_market_price(underlying)
 
                 if current_price:
-                    print(f"[{datetime.datetime.now()}] {underlying} Price: {current_price}, Signal: {signal}")
+                    print(f"[{ist_now_dt}] {underlying} Price: {current_price}, Signal: {signal}")
 
                 # Check for SL/Target
                 if self.current_position and self.active_symbol:
