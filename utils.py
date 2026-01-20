@@ -6,14 +6,13 @@ def get_atm_strike(current_price, strike_interval=50):
     """
     return round(current_price / strike_interval) * strike_interval
 
-def get_option_symbol(underlying_base, expiry_date, strike, option_type):
+def get_option_symbol(exchange, underlying_base, expiry_date, strike, option_type):
     """
     Generates the Fyers option symbol.
-    Format: MCX:CRUDEOILM<YY><MMM><STRIKE><CE/PE>
-    Example: MCX:CRUDEOILM25JAN6500CE
-    Note: expiry_date should be in YYMMM format like '25JAN'
+    Format: {EXCHANGE}:{UNDERLYING}{EXPIRY}{STRIKE}{CE/PE}
+    Example: MCX:CRUDEOILM25JAN6500CE, NSE:NIFTY25FEB23500CE
     """
-    return f"MCX:{underlying_base}{expiry_date}{strike}{option_type}"
+    return f"{exchange}:{underlying_base}{expiry_date}{strike}{option_type}"
 
 def parse_market_data(response, symbol):
     """

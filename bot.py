@@ -16,6 +16,7 @@ class TradeBot:
         self.current_position = None  # None, 'LONG', 'SHORT'
         self.active_symbol = None
         self.entry_price = 0
+        self.current_underlying = None
 
     def get_market_price(self, symbol):
         data = {"symbols": symbol}
@@ -42,12 +43,64 @@ class TradeBot:
         print(f"Order placed for {symbol}: {response}")
         return response
 
+    def is_in_window(self, window):
+        now = datetime.datetime.now().time()
+        start = datetime.datetime.strptime(window[0], "%H:%M").time()
+        end = datetime.datetime.strptime(window[1], "%H:%M").time()
+        return start <= now <= end
+
+    def get_active_config(self):
+        if self.is_in_window(config.NIFTY_WINDOW):
+            return {
+                "underlying": config.NIFTY_SYMBOL,
+                "expiry": config.NIFTY_EXPIRY,
+                "strike_interval": config.NIFTY_STRIKE_INTERVAL,
+                "base": "NIFTY",
+                "exchange": "NSE"
+            }
+        elif self.is_in_window(config.CRUDE_WINDOW):
+            return {
+                "underlying": config.CRUDE_SYMBOL,
+                "expiry": config.CRUDE_EXPIRY,
+                "strike_interval": config.CRUDE_STRIKE_INTERVAL,
+                "base": "CRUDEOILM",
+                "exchange": "MCX"
+            }
+        return None
+
     def run(self):
         print("Starting TradeBot...")
-        underlying = config.SYMBOL_UNDERLYING
         
         while True:
             try:
+                active_cfg = self.get_active_config()
+
+                if not active_cfg:
+                    if self.current_position and self.active_symbol:
+                        print("Outside trading windows. Closing open positions...")
+                        self.place_order(self.active_symbol, -1, config.LOT_SIZE)
+                        self.current_position = None
+                        self.active_symbol = None
+                        self.entry_price = 0
+                        self.current_underlying = None
+
+                    print(f"[{datetime.datetime.now()}] Outside trading hours. Waiting...")
+                    time.sleep(60)
+                    continue
+
+                underlying = active_cfg["underlying"]
+
+                # If we switched instruments, close old position
+                if self.current_underlying and self.current_underlying != underlying:
+                    if self.current_position and self.active_symbol:
+                        print(f"Switching instrument. Closing {self.active_symbol}")
+                        self.place_order(self.active_symbol, -1, config.LOT_SIZE)
+                        self.current_position = None
+                        self.active_symbol = None
+                        self.entry_price = 0
+
+                self.current_underlying = underlying
+
                 # Check for signals
                 signal = strategy.get_current_signal(self.fyers, underlying)
                 current_price = self.get_market_price(underlying)
@@ -91,9 +144,8 @@ class TradeBot:
                         self.place_order(self.active_symbol, -1, config.LOT_SIZE)
                     
                     # Entry Long (Buy Call)
-                    strike = utils.get_atm_strike(current_price)
-                    # Use the expiry from config
-                    option_symbol = utils.get_option_symbol("CRUDEOILM", config.SYMBOL_EXPIRY, strike, "CE")
+                    strike = utils.get_atm_strike(current_price, active_cfg["strike_interval"])
+                    option_symbol = utils.get_option_symbol(active_cfg["exchange"], active_cfg["base"], active_cfg["expiry"], strike, "CE")
                     print(f"Bullish Signal! Buying {option_symbol}")
                     self.place_order(option_symbol, 1, config.LOT_SIZE)
                     self.current_position = 'LONG'
@@ -108,8 +160,8 @@ class TradeBot:
                         self.place_order(self.active_symbol, -1, config.LOT_SIZE)
                     
                     # Entry Short (Buy Put)
-                    strike = utils.get_atm_strike(current_price)
-                    option_symbol = utils.get_option_symbol("CRUDEOILM", config.SYMBOL_EXPIRY, strike, "PE")
+                    strike = utils.get_atm_strike(current_price, active_cfg["strike_interval"])
+                    option_symbol = utils.get_option_symbol(active_cfg["exchange"], active_cfg["base"], active_cfg["expiry"], strike, "PE")
                     print(f"Bearish Signal! Buying {option_symbol}")
                     self.place_order(option_symbol, 1, config.LOT_SIZE)
                     self.current_position = 'SHORT'
