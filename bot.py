@@ -56,26 +56,33 @@ class TradeBot:
                     print(f"[{datetime.datetime.now()}] {underlying} Price: {current_price}, Signal: {signal}")
 
                 # Check for SL/Target
-                if self.current_position and self.active_symbol and self.entry_price and self.entry_price > 0:
-                    option_price = self.get_market_price(self.active_symbol)
-                    if option_price:
-                        target_price = self.entry_price * (1 + config.TARGET_PCT / 100)
-                        sl_price = self.entry_price * (1 - config.STOP_LOSS_PCT / 100)
+                if self.current_position and self.active_symbol:
+                    # If entry price is missing, try to fetch it
+                    if not self.entry_price or self.entry_price <= 0:
+                        self.entry_price = self.get_market_price(self.active_symbol) or 0
+                        if self.entry_price > 0:
+                            print(f"Recovered entry price for {self.active_symbol}: {self.entry_price}")
 
-                        print(f"Checking SL/Target for {self.active_symbol}: Current {option_price}, Target {target_price:.2f}, SL {sl_price:.2f}")
+                    if self.entry_price > 0:
+                        option_price = self.get_market_price(self.active_symbol)
+                        if option_price:
+                            target_price = self.entry_price * (1 + config.TARGET_PCT / 100)
+                            sl_price = self.entry_price * (1 - config.STOP_LOSS_PCT / 100)
 
-                        if option_price >= target_price:
-                            print(f"Target Hit! Exiting {self.active_symbol}")
-                            self.place_order(self.active_symbol, -1, config.LOT_SIZE)
-                            self.current_position = None
-                            self.active_symbol = None
-                            self.entry_price = 0
-                        elif option_price <= sl_price:
-                            print(f"Stop Loss Hit! Exiting {self.active_symbol}")
-                            self.place_order(self.active_symbol, -1, config.LOT_SIZE)
-                            self.current_position = None
-                            self.active_symbol = None
-                            self.entry_price = 0
+                            print(f"Checking SL/Target for {self.active_symbol}: Current {option_price}, Target {target_price:.2f}, SL {sl_price:.2f}")
+
+                            if option_price >= target_price:
+                                print(f"Target Hit! Exiting {self.active_symbol}")
+                                self.place_order(self.active_symbol, -1, config.LOT_SIZE)
+                                self.current_position = None
+                                self.active_symbol = None
+                                self.entry_price = 0
+                            elif option_price <= sl_price:
+                                print(f"Stop Loss Hit! Exiting {self.active_symbol}")
+                                self.place_order(self.active_symbol, -1, config.LOT_SIZE)
+                                self.current_position = None
+                                self.active_symbol = None
+                                self.entry_price = 0
 
                 if signal == 'BULLISH' and self.current_position != 'LONG':
                     # Exit previous short if any
