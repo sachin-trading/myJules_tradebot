@@ -25,3 +25,12 @@ def parse_market_data(response, symbol):
             if item.get('n') == symbol:
                 return item.get('v', {}).get('lp')
     return None
+
+def calculate_mmr_qty(capital, risk_pct, sl_dist):
+    """
+    Calculates quantity based on risk per trade.
+    """
+    risk_amount = capital * risk_pct
+    if sl_dist == 0:
+        return 0
+    return int(risk_amount / sl_dist)
